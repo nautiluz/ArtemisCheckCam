@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Artemis II - Interface Pro (Multi-Source Telemetry)</title>
+    <title>Artemis II - Interface Pro (AR & Multi-Source)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
@@ -29,7 +29,30 @@
             object-fit: cover; z-index: 1; filter: brightness(0.6);
         }
 
-        /* Estilo Control Central */
+        /* Marcadores AR */
+        .ar-marker {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 20;
+        }
+
+        .marker-circle {
+            width: 40px; height: 40px;
+            border: 2px solid white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .marker-line { width: 2px; height: 30px; background: white; margin: 5px 0; }
+        .marker-label { background: rgba(0, 212, 255, 0.8); padding: 2px 8px; font-size: 10px; border-radius: 4px; font-weight: bold; }
+
         .control-panel {
             background: rgba(0, 15, 35, 0.95);
             border: 1px solid var(--panel-border);
@@ -39,16 +62,6 @@
             max-width: 500px;
         }
 
-        .panel-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid rgba(0, 212, 255, 0.2);
-            padding-bottom: 8px;
-            margin-bottom: 10px;
-        }
-
-        /* Radar de Trayectoria Lineal */
         .radar-box {
             background: rgba(0, 10, 25, 0.9);
             border: 1px solid var(--panel-border);
@@ -72,30 +85,19 @@
             transition: width 2s ease-in-out;
         }
 
-        .node {
-            position: absolute; top: -4px; width: 10px; height: 10px;
-            border-radius: 50%;
-        }
-
         .ship-node {
-            width: 12px; height: 12px;
-            background: #fff;
-            box-shadow: 0 0 15px #fff;
-            top: -5px; z-index: 10;
+            position: absolute; top: -5px; width: 12px; height: 12px;
+            background: #fff; box-shadow: 0 0 15px #fff;
+            border-radius: 50%; z-index: 10;
             transition: left 2s ease-in-out;
         }
 
-        .mic-btn-active {
-            animation: glow 1.5s infinite;
-        }
+        .mic-btn-active { animation: glow 1.5s infinite; }
         @keyframes glow { 0%, 100% { border-color: var(--nasa-blue); } 50% { border-color: white; } }
 
         .source-indicator {
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 8px;
-            font-weight: bold;
-            text-transform: uppercase;
+            padding: 2px 6px; border-radius: 4px;
+            font-size: 8px; font-weight: bold; text-transform: uppercase;
         }
         .source-primary { background: #004d99; color: #00d4ff; }
         .source-backup { background: #664400; color: #ffaa00; }
@@ -104,18 +106,36 @@
 <body>
 
 <video id="ar-video" autoplay playsinline muted></video>
-<div id="canvas-3d" class="fixed inset-0 z-10 pointer-events-none"></div>
+
+<!-- Capa AR: Marcadores de Nave y Luna -->
+<div id="ar-layer" class="fixed inset-0 z-20 pointer-events-none overflow-hidden">
+    <div id="moon-marker" class="ar-marker opacity-0">
+        <div class="marker-label">LUNA (TARGET)</div>
+        <div class="marker-line"></div>
+        <div class="marker-circle" style="border-color: #ccc; border-style: dashed;">
+            <div class="w-6 h-6 bg-slate-300 rounded-full"></div>
+        </div>
+    </div>
+    
+    <div id="ship-marker" class="ar-marker opacity-0">
+        <div class="marker-label" style="background: #fff; color: #000;">ORION ARTEMIS II</div>
+        <div class="marker-line" style="background: #00d4ff;"></div>
+        <div class="marker-circle" style="border-color: #00d4ff; animation: pulse 2s infinite;">
+            <div class="w-2 h-2 bg-white rounded-full"></div>
+        </div>
+    </div>
+</div>
 
 <!-- HUD SUPERIOR -->
 <div class="absolute top-0 left-0 right-0 z-50 p-6 flex justify-between items-start pointer-events-none">
     <div class="bg-black/60 p-2 border-l-2 border-cyan-500">
-        <div class="text-[10px] text-cyan-400 font-bold tracking-tighter uppercase">Source: <span id="data-source-label">NASA AROW (Primary)</span></div>
-        <div id="ai-vision-status" class="text-xs text-white uppercase font-bold">LINK: ACTIVE</div>
+        <div class="text-[10px] text-cyan-400 font-bold tracking-tighter uppercase">Source: <span id="data-source-label">NASA AROW (Active)</span></div>
+        <div id="ai-vision-status" class="text-xs text-white uppercase font-bold">AR NAVIGATION: ACTIVE</div>
     </div>
     
     <div class="bg-black/60 p-2 text-right border-r-2 border-cyan-500">
         <div id="met-clock" class="text-xl font-['Orbitron'] text-white">00:00:00:00</div>
-        <div class="text-[8px] text-cyan-500 tracking-widest uppercase">Artemis II Real-Time Telemetry</div>
+        <div class="text-[8px] text-cyan-500 tracking-widest uppercase">Global Space Agency Telemetry Network</div>
     </div>
 </div>
 
@@ -126,23 +146,23 @@
         
         <!-- CONTROL CENTRAL (IA) -->
         <div class="control-panel pointer-events-auto">
-            <div class="panel-header">
-                <span class="text-[10px] font-bold text-cyan-400 tracking-widest">CONTROL CENTRAL - IA AR ARTEMIS</span>
-                <span id="conn-status" class="text-[8px] text-cyan-200 animate-pulse uppercase">Conectado a Houston (DSN)</span>
+            <div class="panel-header flex justify-between items-center border-b border-cyan-900 pb-2 mb-3">
+                <span class="text-[10px] font-bold text-cyan-400 tracking-widest">CONTROL CENTRAL - IA NAVIGATOR</span>
+                <span id="conn-status" class="text-[8px] text-cyan-200 animate-pulse uppercase">Sincronizando Trayectoria...</span>
             </div>
             <p id="ai-voice-text" class="text-xs md:text-sm text-slate-200 italic leading-relaxed">
-                Ing. Rodriguez: Conexión establecida con la página AROW de la NASA. He habilitado redundancia multifuente. Consultas de trayectoria habilitadas vía voz.
+                Ing. Rodriguez: Buscando la Luna en su cuadrante actual. Mueva el dispositivo para escanear el firmamento. Telemetría sincronizada con NASA y ESA.
             </p>
             <div class="mt-4 flex items-center gap-4">
-                <button id="mic-btn" class="w-10 h-10 rounded-full border border-cyan-500/50 flex items-center justify-center bg-cyan-900/20 hover:bg-cyan-500/30 transition-all">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-cyan-400">
+                <button id="mic-btn" class="w-12 h-12 rounded-full border border-cyan-500/50 flex items-center justify-center bg-cyan-900/20 hover:bg-cyan-500/30 transition-all">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-cyan-400">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                     </svg>
                 </button>
                 <div class="flex flex-col">
-                    <div class="text-[8px] text-slate-500 uppercase">Micrófono: <span id="mic-status" class="text-cyan-500">Standby</span></div>
-                    <div class="text-[8px] text-slate-500 uppercase">Signal Strength: <span class="text-green-400">||||| 100%</span></div>
+                    <div class="text-[8px] text-slate-500 uppercase font-bold">Guía Proactiva: <span id="nav-guide" class="text-cyan-400">Buscando Horizonte...</span></div>
+                    <div class="text-[8px] text-slate-500 uppercase mt-1">Vectores AR: <span class="text-green-400">Calibrados</span></div>
                 </div>
             </div>
         </div>
@@ -150,24 +170,15 @@
         <!-- RADAR DE TRAYECTORIA -->
         <div class="radar-box pointer-events-auto">
             <div class="flex justify-between items-center mb-4 border-b border-cyan-900 pb-2">
-                <div class="text-[10px] font-bold text-cyan-400">RADAR DE TRAYECTORIA</div>
-                <div id="source-badge" class="source-indicator source-primary">PRIMARY</div>
+                <div class="text-[10px] font-bold text-cyan-400 uppercase tracking-tighter">Vía de Transferencia Lunar</div>
+                <div id="source-badge" class="source-indicator source-primary">MULTIFUENTE</div>
             </div>
             
             <div class="trajectory-line">
                 <div id="path-fill" class="trajectory-path" style="width: 15%;"></div>
-                <!-- Tierra -->
                 <div class="node left-0 bg-blue-500 shadow-[0_0_8px_blue]"></div>
-                <!-- Nave -->
-                <div id="ship-node" class="node ship-node" style="left: 15%;"></div>
-                <!-- Luna -->
+                <div id="ship-node" class="ship-node" style="left: 15%;"></div>
                 <div class="node right-0 bg-slate-400"></div>
-            </div>
-
-            <div class="flex justify-between text-[8px] text-slate-400 mt-1">
-                <span>TIERRA</span>
-                <span id="system-status" class="text-green-500 font-bold tracking-widest">SISTEMA: NOMINAL</span>
-                <span>LUNA</span>
             </div>
 
             <div class="grid grid-cols-2 gap-4 mt-6">
@@ -186,77 +197,44 @@
 </div>
 
 <script type="module">
-    // --- Lógica de Telemetría Multifuente ---
-    const apiKey = ""; // Contexto iFrame
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'artemis-ii-hud';
-    
+    // --- Lógica de Telemetría Proactiva Multifuente ---
     let missionState = {
-        source: 'NASA_AROW',
-        lastSync: Date.now(),
+        source: 'GLOBAL_SYNC',
         retryCount: 0,
         data: {
             velocity: 1.12,
             distanceFromEarth: 15716,
             progress: 0.05,
-            targetAz: 180
+            // Coordenadas AR (Simuladas basadas en posición real)
+            moonAz: 145, 
+            moonAlt: 45,
+            shipOffset: 2.5 // Desviación visual de la nave respecto a la luna
         }
     };
 
-    const sources = {
-        NASA_AROW: "https://www.nasa.gov/missions/artemis-ii/arow/",
-        ESA_BACKUP: "https://deepspace.esa.int/artemis-ii-relay",
-        DSN_REDUNDANT: "https://eyes.nasa.gov/dsn/dsn.html"
-    };
+    let deviceOrientation = { alpha: 0, beta: 0, gamma: 0 };
 
-    // Función de sincronización con lógica de failover
-    async function syncTelemetry() {
+    async function syncAllAgencies() {
         try {
-            // Simulamos la llamada a la página AROW
-            // En un entorno real, usaríamos un proxy o API específica de NASA
-            const success = Math.random() > 0.1; // 90% de éxito en primaria
-            
-            if (!success) throw new Error("Connection Timeout - Primary Source");
+            // Simulación de consulta a AROW + ESA + JAXA
+            const success = Math.random() > 0.05;
+            if (!success) throw new Error("Fallback required");
 
-            // Simulación de datos extraídos de AROW
-            missionState.data.velocity += (Math.random() - 0.5) * 0.02;
-            missionState.data.distanceFromEarth += 5.5;
-            missionState.data.progress += 0.0005;
+            missionState.data.velocity += (Math.random() - 0.5) * 0.05;
+            missionState.data.distanceFromEarth += 12;
+            missionState.data.progress += 0.0001;
             
-            updateVisuals('primary');
-            missionState.retryCount = 0;
-        } catch (error) {
-            handleFailover(error);
+            updateUI('primary');
+        } catch (e) {
+            console.warn("Agencia Primaria offline. Rotando a nodos secundarios JAXA/ESA...");
+            document.getElementById('data-source-label').innerText = "Secondary Link (ESA/JAXA)";
+            updateUI('backup');
         }
-        
-        setTimeout(syncTelemetry, 15000); // Sincronización cada 15 segundos
+        setTimeout(syncAllAgencies, 15000);
     }
 
-    function handleFailover(err) {
-        missionState.retryCount++;
-        const badge = document.getElementById('source-badge');
-        const label = document.getElementById('data-source-label');
-        const connStatus = document.getElementById('conn-status');
-
-        if (missionState.retryCount < 3) {
-            console.warn("Retrying primary source...");
-            connStatus.innerText = "Reintentando enlace primario...";
-            connStatus.classList.add('text-yellow-400');
-        } else {
-            console.error("Switching to ESA/DSN Backup...");
-            badge.innerText = "BACKUP";
-            badge.className = "source-indicator source-backup";
-            label.innerText = "ESA Deep Space Relay (Backup)";
-            connStatus.innerText = "Enlace de emergencia activo";
-            connStatus.className = "text-[8px] text-orange-400 animate-pulse uppercase";
-            
-            // Ajustar datos con estimación inercial en caso de backup
-            missionState.data.velocity *= 0.999; 
-            updateVisuals('backup');
-        }
-    }
-
-    function updateVisuals(type) {
-        document.getElementById('v-val').innerHTML = `${missionState.data.velocity.toFixed(2)} <span class="text-[8px]">KM/S</span>`;
+    function updateUI(status) {
+        document.getElementById('v-val').innerHTML = `${missionState.data.velocity.toFixed(3)} <span class="text-[8px]">KM/S</span>`;
         document.getElementById('dist-val').innerHTML = `${Math.floor(missionState.data.distanceFromEarth).toLocaleString()} <span class="text-[8px]">KM</span>`;
         
         const prog = Math.min(missionState.data.progress * 100, 95);
@@ -264,7 +242,55 @@
         document.getElementById('ship-node').style.left = prog + "%";
     }
 
-    // --- Control de Voz y Audio ---
+    // --- Motor de Realidad Aumentada (AR) ---
+    function updateARMarkers() {
+        const moonMarker = document.getElementById('moon-marker');
+        const shipMarker = document.getElementById('ship-marker');
+        const navGuide = document.getElementById('nav-guide');
+
+        // Lógica de Skymaps: Calculamos la diferencia entre la orientación del móvil y el objeto
+        // Simplificado para el demo: La Luna está en una posición "fija" en el cielo simulado
+        
+        // El ángulo de visión de la cámara es aprox 60 grados
+        const viewRange = 30; 
+        
+        // Calcular posición en pantalla X basado en Azimuth (alpha)
+        let diffAz = (deviceOrientation.alpha - missionState.data.moonAz);
+        if (diffAz > 180) diffAz -= 360;
+        if (diffAz < -180) diffAz += 360;
+
+        // Calcular posición en pantalla Y basado en Altitude (beta)
+        const diffAlt = (deviceOrientation.beta - missionState.data.moonAlt);
+
+        const screenX = (window.innerWidth / 2) + (diffAz * (window.innerWidth / viewRange));
+        const screenY = (window.innerHeight / 2) + (diffAlt * (window.innerHeight / viewRange));
+
+        // Actualizar Luna
+        if (Math.abs(diffAz) < viewRange && Math.abs(diffAlt) < viewRange) {
+            moonMarker.style.opacity = "1";
+            moonMarker.style.left = `${screenX}px`;
+            moonMarker.style.top = `${screenY}px`;
+            navGuide.innerText = "LUNA EN VISIÓN DIRECTA";
+            navGuide.className = "text-green-400 animate-pulse";
+        } else {
+            moonMarker.style.opacity = "0.2";
+            navGuide.innerText = diffAz > 0 ? "GIRE A LA IZQUIERDA" : "GIRE A LA DERECHA";
+            navGuide.className = "text-cyan-400";
+        }
+
+        // Actualizar Nave (Cerca de la luna con un pequeño offset de trayectoria)
+        if (moonMarker.style.opacity === "1") {
+            shipMarker.style.opacity = "1";
+            shipMarker.style.left = `${screenX + 50}px`;
+            shipMarker.style.top = `${screenY - 30}px`;
+        } else {
+            shipMarker.style.opacity = "0";
+        }
+
+        requestAnimationFrame(updateARMarkers);
+    }
+
+    // --- Control de Voz Proactivo ---
     const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = 'es-ES';
     const synth = window.speechSynthesis;
@@ -282,7 +308,7 @@
     micBtn.onclick = () => {
         recognition.start();
         micBtn.classList.add('mic-btn-active');
-        document.getElementById('mic-status').innerText = "Listening...";
+        document.getElementById('mic-status').innerText = "Escuchando...";
     };
 
     recognition.onresult = (event) => {
@@ -291,45 +317,42 @@
         document.getElementById('mic-status').innerText = "Standby";
         
         let response = "";
-        if (cmd.includes("estatus") || cmd.includes("fuente") || cmd.includes("nasa")) {
-            response = `Ingeniero Rodriguez, estamos operando sobre la fuente ${missionState.retryCount >= 3 ? 'de respaldo ESA' : 'primaria AROW'}. La integridad de los datos es del 98 por ciento.`;
-        } else if (cmd.includes("girar") || cmd.includes("donde")) {
-            response = `Para mantener la señal de telemetría de Houston, gire su dispositivo ${Math.abs(Math.round(180 - heading))} grados.`;
+        if (cmd.includes("donde") || cmd.includes("luna") || cmd.includes("trayectoria")) {
+            response = "Ingeniero Rodriguez, estoy proyectando la trayectoria en su lente. La Luna se encuentra a su cuadrante superior. Siga el vector blanco para localizar la cápsula Orion.";
+        } else if (cmd.includes("telemetria") || cmd.includes("agencias")) {
+            response = "He consolidado datos de NASA AROW, la ESA y JAXA. La señal es fuerte y la velocidad de transferencia es nominal.";
         } else {
-            response = "Comando procesado. Sincronizando con los servidores de trayectoria en tiempo real.";
+            response = "Entendido. Mantengo el escaneo de objetos en tiempo real.";
         }
         
         aiText.innerText = `Ing. Rodriguez: ${response}`;
         speak(response);
     };
 
-    // --- Core HUD & 3D ---
-    let heading = 0, pitch = 0;
-    const launchDate = new Date("2026-04-01T15:00:00Z");
-
+    // --- Inicialización ---
     function init() {
-        // Video Background
         const video = document.getElementById('ar-video');
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
             .then(s => video.srcObject = s);
 
-        // Orientación
         window.addEventListener('deviceorientation', (e) => {
-            heading = e.alpha || 0;
-            pitch = e.beta || 0;
+            deviceOrientation.alpha = e.alpha || 0;
+            deviceOrientation.beta = e.beta || 0;
+            deviceOrientation.gamma = e.gamma || 0;
         });
 
-        // Loop de tiempo
+        // Reloj MET
+        const launchDate = new Date("2026-04-01T15:00:00Z");
         setInterval(() => {
             const diff = new Date() - launchDate;
             const h = Math.floor(diff / 3600000);
             const m = Math.floor((diff % 3600000) / 60000);
             const s = Math.floor((diff % 60000) / 1000);
-            const ms = Math.floor((diff % 1000) / 10);
-            document.getElementById('met-clock').innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}:${ms.toString().padStart(2,'0')}`;
-        }, 100);
+            document.getElementById('met-clock').innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+        }, 1000);
 
-        syncTelemetry();
+        syncAllAgencies();
+        updateARMarkers();
     }
 
     window.onload = init;
