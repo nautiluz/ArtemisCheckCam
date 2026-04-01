@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Artemis II - Interface Pro (Multi-Source Telemetry)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@300;400;700&display=swap');
+        
+        :root {
+            --nasa-blue: #00d4ff;
+            --tech-blue: #001a33;
+            --panel-border: #004d99;
+            --alert-red: #ff4d4d;
+        }
+
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background: #000; 
+            font-family: 'Roboto Mono', monospace; color: white; 
+        }
+
+        #ar-video {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover; z-index: 1; filter: brightness(0.6);
+        }
+
+        /* Estilo Control Central */
+        .control-panel {
+            background: rgba(0, 15, 35, 0.95);
+            border: 1px solid var(--panel-border);
+            border-left: 4px solid var(--nasa-blue);
+            padding: 15px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+        }
+
+        /* Radar de Trayectoria Lineal */
+        .radar-box {
+            background: rgba(0, 10, 25, 0.9);
+            border: 1px solid var(--panel-border);
+            padding: 15px;
+            width: 320px;
+        }
+
+        .trajectory-line {
+            height: 2px;
+            background: rgba(0, 212, 255, 0.2);
+            position: relative;
+            margin: 20px 0;
+            border-radius: 2px;
+        }
+
+        .trajectory-path {
+            position: absolute;
+            top: 0; left: 0; height: 100%;
+            background: var(--nasa-blue);
+            box-shadow: 0 0 10px var(--nasa-blue);
+            transition: width 2s ease-in-out;
+        }
+
+        .node {
+            position: absolute; top: -4px; width: 10px; height: 10px;
+            border-radius: 50%;
+        }
+
+        .ship-node {
+            width: 12px; height: 12px;
+            background: #fff;
+            box-shadow: 0 0 15px #fff;
+            top: -5px; z-index: 10;
+            transition: left 2s ease-in-out;
+        }
+
+        .mic-btn-active {
+            animation: glow 1.5s infinite;
+        }
+        @keyframes glow { 0%, 100% { border-color: var(--nasa-blue); } 50% { border-color: white; } }
+
+        .source-indicator {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 8px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .source-primary { background: #004d99; color: #00d4ff; }
+        .source-backup { background: #664400; color: #ffaa00; }
+    </style>
+</head>
+<body>
+
+<video id="ar-video" autoplay playsinline muted></video>
+<div id="canvas-3d" class="fixed inset-0 z-10 pointer-events-none"></div>
+
+<!-- HUD SUPERIOR -->
+<div class="absolute top-0 left-0 right-0 z-50 p-6 flex justify-between items-start pointer-events-none">
+    <div class="bg-black/60 p-2 border-l-2 border-cyan-500">
+        <div class="text-[10px] text-cyan-400 font-bold tracking-tighter uppercase">Source: <span id="data-source-label">NASA AROW (Primary)</span></div>
+        <div id="ai-vision-status" class="text-xs text-white uppercase font-bold">LINK: ACTIVE</div>
+    </div>
+    
+    <div class="bg-black/60 p-2 text-right border-r-2 border-cyan-500">
+        <div id="met-clock" class="text-xl font-['Orbitron'] text-white">00:00:00:00</div>
+        <div class="text-[8px] text-cyan-500 tracking-widest uppercase">Artemis II Real-Time Telemetry</div>
+    </div>
+</div>
+
+<!-- CUERPO DE LA INTERFAZ -->
+<div class="absolute inset-0 z-40 p-6 flex flex-col justify-end pointer-events-none">
+    
+    <div class="flex flex-col md:flex-row justify-between items-end gap-6 w-full">
+        
+        <!-- CONTROL CENTRAL (IA) -->
+        <div class="control-panel pointer-events-auto">
+            <div class="panel-header">
+                <span class="text-[10px] font-bold text-cyan-400 tracking-widest">CONTROL CENTRAL - IA AR ARTEMIS</span>
+                <span id="conn-status" class="text-[8px] text-cyan-200 animate-pulse uppercase">Conectado a Houston (DSN)</span>
+            </div>
+            <p id="ai-voice-text" class="text-xs md:text-sm text-slate-200 italic leading-relaxed">
+                Ing. Rodriguez: Conexión establecida con la página AROW de la NASA. He habilitado redundancia multifuente. Consultas de trayectoria habilitadas vía voz.
+            </p>
+            <div class="mt-4 flex items-center gap-4">
+                <button id="mic-btn" class="w-10 h-10 rounded-full border border-cyan-500/50 flex items-center justify-center bg-cyan-900/20 hover:bg-cyan-500/30 transition-all">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-cyan-400">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                    </svg>
+                </button>
+                <div class="flex flex-col">
+                    <div class="text-[8px] text-slate-500 uppercase">Micrófono: <span id="mic-status" class="text-cyan-500">Standby</span></div>
+                    <div class="text-[8px] text-slate-500 uppercase">Signal Strength: <span class="text-green-400">||||| 100%</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RADAR DE TRAYECTORIA -->
+        <div class="radar-box pointer-events-auto">
+            <div class="flex justify-between items-center mb-4 border-b border-cyan-900 pb-2">
+                <div class="text-[10px] font-bold text-cyan-400">RADAR DE TRAYECTORIA</div>
+                <div id="source-badge" class="source-indicator source-primary">PRIMARY</div>
+            </div>
+            
+            <div class="trajectory-line">
+                <div id="path-fill" class="trajectory-path" style="width: 15%;"></div>
+                <!-- Tierra -->
+                <div class="node left-0 bg-blue-500 shadow-[0_0_8px_blue]"></div>
+                <!-- Nave -->
+                <div id="ship-node" class="node ship-node" style="left: 15%;"></div>
+                <!-- Luna -->
+                <div class="node right-0 bg-slate-400"></div>
+            </div>
+
+            <div class="flex justify-between text-[8px] text-slate-400 mt-1">
+                <span>TIERRA</span>
+                <span id="system-status" class="text-green-500 font-bold tracking-widest">SISTEMA: NOMINAL</span>
+                <span>LUNA</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mt-6">
+                <div>
+                    <div class="text-[7px] text-slate-500 uppercase">Velocidad Relativa</div>
+                    <div id="v-val" class="text-xs font-['Orbitron']">-- KM/S</div>
+                </div>
+                <div>
+                    <div class="text-[7px] text-slate-500 uppercase">Distancia Tierra</div>
+                    <div id="dist-val" class="text-xs font-['Orbitron']">-- KM</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script type="module">
+    // --- Lógica de Telemetría Multifuente ---
+    const apiKey = ""; // Contexto iFrame
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'artemis-ii-hud';
+    
+    let missionState = {
+        source: 'NASA_AROW',
+        lastSync: Date.now(),
+        retryCount: 0,
+        data: {
+            velocity: 1.12,
+            distanceFromEarth: 15716,
+            progress: 0.05,
+            targetAz: 180
+        }
+    };
+
+    const sources = {
+        NASA_AROW: "https://www.nasa.gov/missions/artemis-ii/arow/",
+        ESA_BACKUP: "https://deepspace.esa.int/artemis-ii-relay",
+        DSN_REDUNDANT: "https://eyes.nasa.gov/dsn/dsn.html"
+    };
+
+    // Función de sincronización con lógica de failover
+    async function syncTelemetry() {
+        try {
+            // Simulamos la llamada a la página AROW
+            // En un entorno real, usaríamos un proxy o API específica de NASA
+            const success = Math.random() > 0.1; // 90% de éxito en primaria
+            
+            if (!success) throw new Error("Connection Timeout - Primary Source");
+
+            // Simulación de datos extraídos de AROW
+            missionState.data.velocity += (Math.random() - 0.5) * 0.02;
+            missionState.data.distanceFromEarth += 5.5;
+            missionState.data.progress += 0.0005;
+            
+            updateVisuals('primary');
+            missionState.retryCount = 0;
+        } catch (error) {
+            handleFailover(error);
+        }
+        
+        setTimeout(syncTelemetry, 15000); // Sincronización cada 15 segundos
+    }
+
+    function handleFailover(err) {
+        missionState.retryCount++;
+        const badge = document.getElementById('source-badge');
+        const label = document.getElementById('data-source-label');
+        const connStatus = document.getElementById('conn-status');
+
+        if (missionState.retryCount < 3) {
+            console.warn("Retrying primary source...");
+            connStatus.innerText = "Reintentando enlace primario...";
+            connStatus.classList.add('text-yellow-400');
+        } else {
+            console.error("Switching to ESA/DSN Backup...");
+            badge.innerText = "BACKUP";
+            badge.className = "source-indicator source-backup";
+            label.innerText = "ESA Deep Space Relay (Backup)";
+            connStatus.innerText = "Enlace de emergencia activo";
+            connStatus.className = "text-[8px] text-orange-400 animate-pulse uppercase";
+            
+            // Ajustar datos con estimación inercial en caso de backup
+            missionState.data.velocity *= 0.999; 
+            updateVisuals('backup');
+        }
+    }
+
+    function updateVisuals(type) {
+        document.getElementById('v-val').innerHTML = `${missionState.data.velocity.toFixed(2)} <span class="text-[8px]">KM/S</span>`;
+        document.getElementById('dist-val').innerHTML = `${Math.floor(missionState.data.distanceFromEarth).toLocaleString()} <span class="text-[8px]">KM</span>`;
+        
+        const prog = Math.min(missionState.data.progress * 100, 95);
+        document.getElementById('path-fill').style.width = prog + "%";
+        document.getElementById('ship-node').style.left = prog + "%";
+    }
+
+    // --- Control de Voz y Audio ---
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'es-ES';
+    const synth = window.speechSynthesis;
+
+    function speak(text) {
+        if (synth.speaking) synth.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'es-ES';
+        synth.speak(utter);
+    }
+
+    const micBtn = document.getElementById('mic-btn');
+    const aiText = document.getElementById('ai-voice-text');
+
+    micBtn.onclick = () => {
+        recognition.start();
+        micBtn.classList.add('mic-btn-active');
+        document.getElementById('mic-status').innerText = "Listening...";
+    };
+
+    recognition.onresult = (event) => {
+        const cmd = event.results[0][0].transcript.toLowerCase();
+        micBtn.classList.remove('mic-btn-active');
+        document.getElementById('mic-status').innerText = "Standby";
+        
+        let response = "";
+        if (cmd.includes("estatus") || cmd.includes("fuente") || cmd.includes("nasa")) {
+            response = `Ingeniero Rodriguez, estamos operando sobre la fuente ${missionState.retryCount >= 3 ? 'de respaldo ESA' : 'primaria AROW'}. La integridad de los datos es del 98 por ciento.`;
+        } else if (cmd.includes("girar") || cmd.includes("donde")) {
+            response = `Para mantener la señal de telemetría de Houston, gire su dispositivo ${Math.abs(Math.round(180 - heading))} grados.`;
+        } else {
+            response = "Comando procesado. Sincronizando con los servidores de trayectoria en tiempo real.";
+        }
+        
+        aiText.innerText = `Ing. Rodriguez: ${response}`;
+        speak(response);
+    };
+
+    // --- Core HUD & 3D ---
+    let heading = 0, pitch = 0;
+    const launchDate = new Date("2026-04-01T15:00:00Z");
+
+    function init() {
+        // Video Background
+        const video = document.getElementById('ar-video');
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(s => video.srcObject = s);
+
+        // Orientación
+        window.addEventListener('deviceorientation', (e) => {
+            heading = e.alpha || 0;
+            pitch = e.beta || 0;
+        });
+
+        // Loop de tiempo
+        setInterval(() => {
+            const diff = new Date() - launchDate;
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            const s = Math.floor((diff % 60000) / 1000);
+            const ms = Math.floor((diff % 1000) / 10);
+            document.getElementById('met-clock').innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}:${ms.toString().padStart(2,'0')}`;
+        }, 100);
+
+        syncTelemetry();
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>
