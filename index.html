@@ -45,17 +45,8 @@
             box-shadow: 0 0 30px rgba(0, 212, 255, 0.15), inset 0 0 20px rgba(0,0,0,0.5);
         }
 
-        .panel-alert {
-            border-color: rgba(255, 61, 61, 0.5);
-            box-shadow: 0 0 30px rgba(255, 61, 61, 0.2);
-        }
-
         .text-glow {
             text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
-        }
-
-        .border-glow {
-            box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
         }
 
         .scan-line {
@@ -261,7 +252,7 @@
         .status-warning { background: rgba(255, 200, 0, 0.2); color: #ffc800; }
         .status-critical { background: rgba(255, 61, 61, 0.2); color: var(--nasa-red); }
 
-        #init-overlay {
+        .init-overlay {
             position: fixed; inset: 0; z-index: 1000;
             background: #000010;
             display: flex; flex-direction: column;
@@ -279,28 +270,6 @@
 
         @keyframes spin {
             to { transform: rotate(360deg); }
-        }
-
-        .permission-btn {
-            background: linear-gradient(135deg, var(--nasa-blue), #0088aa);
-            border: none; padding: 15px 30px;
-            border-radius: 25px;
-            color: white; font-weight: bold;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 0 20px rgba(0,212,255,0.4);
-        }
-
-        .permission-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 0 30px rgba(0,212,255,0.6);
-        }
-
-        .permission-btn:disabled {
-            background: #333;
-            box-shadow: none;
-            cursor: not-allowed;
         }
 
         .data-row {
@@ -336,6 +305,30 @@
             border-radius: 2px;
             transition: width 0.5s ease;
         }
+
+        .ai-pulse {
+            width: 10px; height: 10px;
+            background: var(--system-green);
+            border-radius: 50%;
+            animation: aiPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes aiPulse {
+            0%, 100% { box-shadow: 0 0 5px var(--system-green); }
+            50% { box-shadow: 0 0 20px var(--system-green), 0 0 30px var(--system-green); }
+        }
+
+        .pulsing-dot {
+            width: 8px; height: 8px;
+            background: var(--nasa-blue);
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.5; }
+        }
     </style>
 </head>
 <body>
@@ -343,33 +336,20 @@
 <video id="ar-video" autoplay playsinline muted></video>
 <div class="scan-line"></div>
 
-<div id="init-overlay">
-    <div class="init-spinner mb-6"></div>
-    <div class="text-[14px] text-cyan-400 mb-2 font-bold tracking-[0.3em]">ARTEMIS II TRACKER</div>
-    <div class="text-[10px] text-slate-500 mb-8 uppercase">Sistema de Visión AR + IA</div>
-    
-    <div class="flex flex-col gap-3 items-center" id="permission-buttons">
-        <button id="btn-perms" class="permission-btn">
-            INICIAR SISTEMA AR
-        </button>
-    </div>
-    
-    <div class="hidden text-center mt-6" id="init-status">
-        <div class="text-[11px] text-cyan-400" id="init-text">Inicializando...</div>
-    </div>
-</div>
-
-<div class="hud-overlay">
+<div class="hud-overlay" id="hud" style="opacity: 0;">
     <div class="absolute top-0 left-0 right-0 p-3 flex justify-between items-start">
         <div class="panel-glass p-3 rounded-lg border-l-4 border-cyan-500 max-w-[260px]">
-            <div class="text-[9px] text-cyan-400 font-bold tracking-widest mb-1">MISSION CONTROL IA</div>
+            <div class="flex items-center gap-2 mb-1">
+                <div class="ai-pulse" id="ai-indicator"></div>
+                <div class="text-[9px] text-cyan-400 font-bold tracking-widest">MISSION CONTROL IA</div>
+            </div>
             <div id="ai-status" class="text-[10px] text-slate-300 leading-tight">
-                Sistema en standby...
+                Sistema autonomouso iniciado...
             </div>
         </div>
         
         <div class="panel-glass p-3 rounded-lg text-right border-r-4 border-cyan-500">
-            <div id="met-clock" class="text-xl font-['Orbitron'] text-white text-glow">00:00:00:00</div>
+            <div id="met-clock" class="text-xl font-['Orbitron'] text-white text-glow">T-00:00:00:00</div>
             <div class="text-[7px] text-cyan-400 font-bold uppercase tracking-tighter">MET • ARTEMIS II</div>
         </div>
     </div>
@@ -458,21 +438,22 @@
 
     <div class="absolute right-3 bottom-20 w-72 max-h-48 panel-glass rounded-lg pointer-events-auto overflow-hidden flex flex-col">
         <div class="p-2 border-b border-cyan-500/30 flex justify-between items-center">
-            <div class="text-[9px] text-cyan-400 font-bold uppercase">IA Chat</div>
-            <div class="flex gap-2">
-                <button id="mic-btn" class="w-8 h-8 rounded-full bg-cyan-500/20 border border-cyan-500/50 flex items-center justify-center hover:bg-cyan-500/30 transition">
-                    <svg class="w-4 h-4 text-cyan-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
-                </button>
-                <button id="speaker-btn" class="w-8 h-8 rounded-full bg-cyan-500/20 border border-cyan-500/50 flex items-center justify-center hover:bg-cyan-500/30 transition">
-                    <svg class="w-4 h-4 text-cyan-400" fill="currentColor" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-                </button>
+            <div class="flex items-center gap-2">
+                <div class="pulsing-dot" id="voice-indicator"></div>
+                <div class="text-[9px] text-cyan-400 font-bold uppercase">Asistente IA</div>
             </div>
         </div>
         <div id="chat-container" class="flex-1 overflow-y-auto p-2">
-            <div class="chat-message chat-ai">
-                <span class="text-cyan-400 font-bold">IA:</span> Hola, soy tu asistente Artemis II. Puedo darte información sobre la misión, posición de Orión y guiarte para encontrar la Luna. ¿Qué deseas saber?
-            </div>
         </div>
+    </div>
+</div>
+
+<div class="init-overlay" id="init-overlay">
+    <div class="init-spinner mb-6"></div>
+    <div class="text-[14px] text-cyan-400 mb-2 font-bold tracking-[0.3em]">ARTEMIS II TRACKER</div>
+    <div class="text-[10px] text-slate-500 mb-4 uppercase">Sistema Autónoma de Rastreo AR + IA</div>
+    <div class="text-[11px] text-center text-cyan-400 px-8" id="init-status">
+        Inicializando sistema...
     </div>
 </div>
 
@@ -492,23 +473,18 @@ const ArtemisApp = {
             crew: ['Reid Wiseman', 'Victor Glover', 'Christina Koch', 'Jeremy Hansen'],
             location: 'Kennedy Space Center'
         },
-        orion: {
-            lat: 28.5721,
-            lon: -80.6480,
-            alt: 0,
-            velocity: 0
-        },
         moon: {
             az: 0,
             el: 0,
             distance: 384400
         },
         voice: {
+            recognition: null,
             listening: false,
             synthesisEnabled: true
         },
         nasaLink: false,
-        lastUpdate: null
+        autoMode: true
     },
 
     elements: {},
@@ -516,17 +492,17 @@ const ArtemisApp = {
     init() {
         this.cacheElements();
         this.bindEvents();
-        this.updateCountdown();
+        this.autonomousStart();
     },
 
     cacheElements() {
         this.elements = {
             video: document.getElementById('ar-video'),
+            hud: document.getElementById('hud'),
             initOverlay: document.getElementById('init-overlay'),
             initStatus: document.getElementById('init-status'),
-            initText: document.getElementById('init-text'),
-            btnPerms: document.getElementById('btn-perms'),
             aiStatus: document.getElementById('ai-status'),
+            aiIndicator: document.getElementById('ai-indicator'),
             metClock: document.getElementById('met-clock'),
             compassNeedle: document.getElementById('compass-needle'),
             compassDeg: document.getElementById('compass-deg'),
@@ -534,7 +510,6 @@ const ArtemisApp = {
             orionAr: document.getElementById('orion-ar'),
             navGuide: document.getElementById('nav-guide'),
             navArrow: document.getElementById('nav-arrow'),
-            navIndicator: document.getElementById('nav-indicator'),
             radarMoon: document.getElementById('radar-moon'),
             radarOrion: document.getElementById('radar-orion'),
             targetDistance: document.getElementById('target-distance'),
@@ -545,41 +520,62 @@ const ArtemisApp = {
             signalBar: document.getElementById('signal-bar'),
             linkStatus: document.getElementById('link-status'),
             chatContainer: document.getElementById('chat-container'),
-            micBtn: document.getElementById('mic-btn'),
-            speakerBtn: document.getElementById('speaker-btn')
+            voiceIndicator: document.getElementById('voice-indicator')
         };
     },
 
     bindEvents() {
-        this.elements.btnPerms.addEventListener('click', () => this.requestPermissions());
-        this.elements.micBtn.addEventListener('click', () => this.toggleVoiceInput());
-        this.elements.speakerBtn.addEventListener('click', () => this.toggleVoiceOutput());
-        
         window.addEventListener('deviceorientation', (e) => this.handleOrientation(e));
         window.addEventListener('resize', () => this.updateARPosition());
     },
 
-    async requestPermissions() {
-        const btn = this.elements.btnPerms;
-        btn.disabled = true;
-        btn.innerHTML = 'SOLICITANDO PERMISOS...';
+    async autonomousStart() {
+        this.updateStatus('Iniciando sistema autónomo...');
         
+        await this.initCamera();
+        await this.initMicrophone();
+        await this.initGPS();
+        
+        this.initVoiceRecognition();
+        this.connectNASA();
+        this.startMissionClock();
+        
+        this.state.initialized = true;
+        this.showHUD();
+        
+        this.speak('Sistema autónomo Artemis II iniciado. Bienvenido. La Luna se encuentra en el cielo. Busca el punto más brillante para localizarla. Puedo responder a tus preguntas sobre la misión.');
+        
+        this.periodicUpdate();
+    },
+
+    async initCamera() {
+        this.updateStatus('Activando cámara...');
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
-                audio: true
+                video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
             });
-            this.state.permissions.camera = true;
-            this.state.permissions.microphone = true;
             this.elements.video.srcObject = stream;
-            
-            this.speak('Permisos de cámara y micrófono concedidos. Iniciando sistema de rastreo Artemis II.');
+            this.state.permissions.camera = true;
+            this.updateStatus('Cámara activada');
         } catch (err) {
-            console.error('Error permissions:', err);
-            this.speak('No se pudieron obtener los permisos. Iniciando en modo reducido.');
+            console.error('Camera error:', err);
+            this.updateStatus('Cámara no disponible');
         }
+    },
 
-        this.initGPS();
+    async initMicrophone() {
+        this.updateStatus('Activando micrófono...');
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: { echoCancellation: true, noiseSuppression: true }
+            });
+            stream.getTracks().forEach(track => track.stop());
+            this.state.permissions.microphone = true;
+            this.updateStatus('Micrófono activado');
+        } catch (err) {
+            console.error('Mic error:', err);
+            this.updateStatus('Micrófono no disponible');
+        }
     },
 
     async initGPS() {
@@ -594,9 +590,8 @@ const ArtemisApp = {
                     this.state.gps.accuracy = pos.coords.accuracy;
                     this.state.permissions.gps = true;
                     
-                    this.updateStatus(`GPS activo. Lat: ${this.state.gps.lat.toFixed(4)}, Lon: ${this.state.gps.lon.toFixed(4)}`);
+                    this.updateStatus(`GPS activo: ${this.state.gps.lat.toFixed(4)}, ${this.state.gps.lon.toFixed(4)}`);
                     this.calculateMoonPosition();
-                    this.connectNASA();
                 },
                 (err) => {
                     console.error('GPS Error:', err);
@@ -613,9 +608,8 @@ const ArtemisApp = {
         this.state.gps.lat = 40.7128;
         this.state.gps.lon = -74.0060;
         this.state.gps.alt = 10;
-        this.updateStatus('Modo inercial activado. Usando posición predeterminada.');
+        this.updateStatus('Modo inercial: Nueva York (predeterminado)');
         this.calculateMoonPosition();
-        this.connectNASA();
     },
 
     calculateMoonPosition() {
@@ -635,11 +629,42 @@ const ArtemisApp = {
         this.updateTelemetry();
         this.updateARPosition();
         this.updateRadar();
-        
-        this.state.initialized = true;
-        this.hideInitOverlay();
-        
-        this.speak(`Sistema listo. La Luna se encuentra a ${this.state.moon.distance.toLocaleString()} kilómetros, con azimut ${Math.round(this.state.moon.az)} grados y elevación ${Math.round(this.state.moon.el)} grados.`);
+    },
+
+    initVoiceRecognition() {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            this.state.voice.recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            this.state.voice.recognition.lang = 'es-ES';
+            this.state.voice.recognition.continuous = true;
+            this.state.voice.recognition.interimResults = true;
+            this.state.voice.recognition.interim = true;
+            
+            this.state.voice.recognition.onstart = () => {
+                this.state.voice.listening = true;
+                this.elements.voiceIndicator.style.animationPlayState = 'running';
+            };
+            
+            this.state.voice.recognition.onend = () => {
+                this.state.voice.listening = false;
+                this.elements.voiceIndicator.style.animationPlayState = 'paused';
+                if (this.state.initialized) {
+                    this.state.voice.recognition.start();
+                }
+            };
+            
+            this.state.voice.recognition.onresult = (event) => {
+                const transcript = Array.from(event.results)
+                    .map(result => result[0].transcript)
+                    .join('');
+                
+                if (event.results[0].isFinal && transcript.trim().length > 0) {
+                    this.handleVoiceCommand(transcript.toLowerCase().trim());
+                }
+            };
+            
+            this.state.voice.recognition.start();
+            this.updateStatus('Asistente de voz activo');
+        }
     },
 
     handleOrientation(e) {
@@ -722,7 +747,7 @@ const ArtemisApp = {
     },
 
     async connectNASA() {
-        this.updateStatus('Conectando con NASA AROW...');
+        this.updateStatus('Conectando con NASA...');
         
         try {
             const response = await fetch('https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY');
@@ -731,10 +756,9 @@ const ArtemisApp = {
                 this.elements.linkStatus.className = 'status-badge status-nominal';
                 this.elements.linkStatus.innerHTML = '<span class="w-2 h-2 rounded-full bg-current"></span> NASA: CONNECTED';
                 this.elements.signalBar.style.width = '95%';
-                this.updateStatus('Enlace NASA AROW establecido. Recibiendo telemetría de Orión.');
+                this.updateStatus('Enlace NASA establecido');
             }
         } catch (e) {
-            this.state.nasaLink = false;
             this.simulateNASAData();
         }
     },
@@ -743,41 +767,45 @@ const ArtemisApp = {
         this.elements.linkStatus.className = 'status-badge status-warning';
         this.elements.linkStatus.innerHTML = '<span class="w-2 h-2 rounded-full bg-current"></span> NASA: SIMULATED';
         this.elements.signalBar.style.width = '75%';
-        this.updateStatus('Modo simulación. Usando datos astronómicos calculados localmente.');
+        this.updateStatus('Modo simulación activo');
     },
 
     updateStatus(text) {
         this.elements.aiStatus.textContent = text;
+        this.elements.initStatus.textContent = text;
     },
 
-    updateCountdown() {
+    startMissionClock() {
+        const launchDate = new Date('2026-04-01T17:35:00-04:00');
+        
         setInterval(() => {
-            if (this.state.mission.startTime) {
-                const diff = Date.now() - this.state.mission.startTime;
+            const now = new Date();
+            const diff = launchDate - now;
+            
+            if (diff > 0) {
                 const days = Math.floor(diff / 86400000);
                 const hours = Math.floor((diff % 86400000) / 3600000);
                 const mins = Math.floor((diff % 3600000) / 60000);
                 const secs = Math.floor((diff % 60000) / 1000);
-                this.elements.metClock.textContent = `${days.toString().padStart(2, '0')}:${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                this.elements.metClock.textContent = `T-${days.toString().padStart(2, '0')}:${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
             } else {
-                const launchDate = new Date('2026-04-01T17:35:00-04:00');
-                const now = new Date();
-                const diff = launchDate - now;
-                
-                if (diff > 0) {
-                    const days = Math.floor(diff / 86400000);
-                    const hours = Math.floor((diff % 86400000) / 3600000);
-                    const mins = Math.floor((diff % 3600000) / 60000);
-                    const secs = Math.floor((diff % 60000) / 1000);
-                    this.elements.metClock.textContent = `T-${days.toString().padStart(2, '0')}:${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-                } else {
+                if (!this.state.mission.startTime) {
                     this.state.mission.startTime = now.getTime();
+                    this.speak('Artemis II ha despegado. Comienza la misión.');
                 }
+                
+                const missionTime = now.getTime() - this.state.mission.startTime;
+                const days = Math.floor(missionTime / 86400000);
+                const hours = Math.floor((missionTime % 86400000) / 3600000);
+                const mins = Math.floor((missionTime % 3600000) / 60000);
+                const secs = Math.floor((missionTime % 60000) / 1000);
+                this.elements.metClock.textContent = `${days.toString().padStart(2, '0')}:${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
             }
         }, 1000);
     },
 
-    hideInitOverlay() {
+    showHUD() {
+        this.elements.hud.style.opacity = '1';
         this.elements.initOverlay.style.opacity = '0';
         setTimeout(() => {
             this.elements.initOverlay.style.display = 'none';
@@ -792,86 +820,33 @@ const ArtemisApp = {
         utterance.rate = 0.95;
         utterance.pitch = 1;
         
-        const voices = speechSynthesis.getVoices();
-        const spanishVoice = voices.find(v => v.lang.includes('es')) || voices[0];
-        if (spanishVoice) utterance.voice = spanishVoice;
-        
         speechSynthesis.speak(utterance);
     },
 
-    toggleVoiceInput() {
-        const btn = this.elements.micBtn;
-        
-        if (this.state.voice.listening) {
-            this.state.voice.listening = false;
-            btn.classList.remove('bg-red-500/30', 'border-red-500');
-            btn.classList.add('bg-cyan-500/20', 'border-cyan-500/50');
-        } else {
-            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-                this.recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-                this.recognition.lang = 'es-ES';
-                this.recognition.continuous = true;
-                this.recognition.interimResults = true;
-                
-                this.recognition.onresult = (event) => {
-                    const transcript = Array.from(event.results)
-                        .map(result => result[0].transcript)
-                        .join('');
-                    
-                    if (event.results[0].isFinal) {
-                        this.handleVoiceCommand(transcript.toLowerCase());
-                    }
-                };
-                
-                this.recognition.onerror = () => {
-                    this.state.voice.listening = false;
-                    btn.classList.remove('bg-red-500/30', 'border-red-500');
-                };
-                
-                this.recognition.start();
-                this.state.voice.listening = true;
-                btn.classList.remove('bg-cyan-500/20', 'border-cyan-500/50');
-                btn.classList.add('bg-red-500/30', 'border-red-500');
-                this.speak('Escuchando comandos de voz.');
-            } else {
-                this.speak('Reconocimiento de voz no disponible en este navegador.');
-            }
-        }
-    },
-
-    toggleVoiceOutput() {
-        this.state.voice.synthesisEnabled = !this.state.voice.synthesisEnabled;
-        const btn = this.elements.speakerBtn;
-        
-        if (this.state.voice.synthesisEnabled) {
-            btn.classList.remove('opacity-50');
-            this.speak('Synthesizer de voz activado.');
-        } else {
-            btn.classList.add('opacity-50');
-        }
-    },
-
     handleVoiceCommand(cmd) {
-        this.addChatMessage('Usuario', cmd);
+        this.addChatMessage('Tú', cmd);
         
         let response = '';
+        let action = null;
         
-        if (cmd.includes('dónde') || cmd.includes('donde') || cmd.includes('posición') || cmd.includes('posicion')) {
+        if (cmd.includes('dónde') || cmd.includes('donde') || cmd.includes('posición') || cmd.includes('posicion') || cmd.includes('está')) {
             response = `Orión se encuentra a ${this.state.target.distance.toLocaleString()} kilómetros de la Tierra. La Luna está en azimuth ${Math.round(this.state.target.az)} grados y elevación ${Math.round(this.state.target.el)} grados.`;
-        } else if (cmd.includes('estado') || cmd.includes('status')) {
-            response = `Misión ${this.state.mission.name}: ${this.state.mission.status}. Fase actual: ${this.state.mission.phase}. Tripulación: ${this.state.mission.crew.join(', ')}.`;
-        } else if (cmd.includes('velocidad') || cmd.includes('speed')) {
-            response = `Velocidad actual de Orión: aproximadamente 1.12 kilómetros por segundo.`;
-        } else if (cmd.includes('luna') || cmd.includes('moon')) {
-            response = `La Luna está a ${this.state.moon.distance.toLocaleString()} kilómetros. Gire el dispositivo hacia azimuth ${Math.round(this.state.moon.az)} grados y elevación ${Math.round(this.state.moon.el)} grados para verla.`;
-        } else if (cmd.includes('tripulación') || cmd.includes('crew') || cmd.includes('astronautas')) {
+        } else if (cmd.includes('estado') || cmd.includes('status') || cmd.includes('cómo va')) {
+            response = `Misión ${this.state.mission.name}: ${this.state.mission.status}. Fase actual: ${this.state.mission.phase}.`;
+        } else if (cmd.includes('tripulación') || cmd.includes('crew') || cmd.includes('astronautas') || cmd.includes('quién va')) {
             response = `La tripulación de Artemis II está compuesta por: ${this.state.mission.crew.join(', ')}.`;
-        } else if (cmd.includes('hola') || cmd.includes('hi') || cmd.includes('hello')) {
-            response = 'Hola! Soy el asistente IA de Artemis II. Puedo informarte sobre la misión, posición de la nave y guiarte para encontrar la Luna. ¿Qué deseas saber?';
-        } else if (cmd.includes('gracias') || cmd.includes('thanks')) {
-            response = 'De nada! Estoy aquí para ayudarte a seguir la misión Artemis II. ¿Hay algo más que quieras saber?';
+        } else if (cmd.includes('luna') || cmd.includes('moon') || cmd.includes('dónde está la luna')) {
+            response = `La Luna está a ${this.state.moon.distance.toLocaleString()} kilómetros. Gire el dispositivo hacia azimuth ${Math.round(this.state.moon.az)} grados y elevación ${Math.round(this.state.moon.el)} grados para verla.`;
+        } else if (cmd.includes('velocidad') || cmd.includes('speed') || cmd.includes('qué tan rápido')) {
+            response = `Velocidad actual de Orión: aproximadamente 1.12 kilómetros por segundo.`;
+        } else if (cmd.includes('hola') || cmd.includes('hi') || cmd.includes('hello') || cmd.includes('buenos días')) {
+            response = 'Hola! Soy el asistente autónomo de Artemis II. Estoy monitoreando la misión en tiempo real. ¿Qué deseas saber?';
+        } else if (cmd.includes('gracias')) {
+            response = 'De nada! Estoy aquí para ayudarte a seguir la misión Artemis II.';
+        } else if (cmd.includes('qué ves') || cmd.includes('qué puedes hacer') || cmd.includes('ayuda')) {
+            response = 'Puedo darte información sobre la posición de Orión y la Luna, el estado de la misión, la tripuración, y guiarte para encontrar la Luna en el cielo. Solo pregunta!';
         } else {
-            response = 'No entendí el comando. Puedes preguntar sobre la posición de Orión, el estado de la misión, la Luna, o la tripulación. ¿Qué deseas saber?';
+            response = 'No entendí. Puedo ayudarte con: posición de la Luna, estado de la misión, información de la tripulación, o velocidad de la nave. ¿Qué quieres saber?';
         }
         
         this.addChatMessage('IA', response);
@@ -885,6 +860,15 @@ const ArtemisApp = {
         msg.innerHTML = `<span class="text-cyan-400 font-bold">${sender}:</span> ${text}`;
         container.appendChild(msg);
         container.scrollTop = container.scrollHeight;
+    },
+
+    periodicUpdate() {
+        setInterval(() => {
+            if (this.state.initialized) {
+                this.calculateMoonPosition();
+                this.updateTelemetry();
+            }
+        }, 5000);
     }
 };
 
@@ -896,4 +880,5 @@ if ('serviceWorker' in navigator) {
         .catch(err => console.log('SW error:', err));
 }
 </script>
-
+</body>
+</html>
